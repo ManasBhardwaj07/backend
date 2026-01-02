@@ -89,14 +89,14 @@ public class SecurityConfig {
 @Order(1)
 SecurityFilterChain oauthChain(HttpSecurity http) throws Exception {
     return http
-            .securityMatcher("/oauth2/**", "/login/oauth2/**")
+            .securityMatcher("/login", "/login/**", "/oauth2/**", "/login/oauth2/**")
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
-            .formLogin(Customizer.withDefaults())
             .oauth2Login(oauth -> oauth
                     .successHandler(oAuth2SuccessHandler) // return JWT JSON from backend
             )
+            .httpBasic(Customizer.withDefaults())
             .build();
 }
 
@@ -108,7 +108,7 @@ SecurityFilterChain oauthChain(HttpSecurity http) throws Exception {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/login", "/login/**", "/oauth2/**", "/login/oauth2/**", "/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
@@ -116,10 +116,6 @@ SecurityFilterChain oauthChain(HttpSecurity http) throws Exception {
                 .formLogin(form -> form.disable())
                 .build();
     }
-
-
-
-
 
 
 }
