@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 import org.hibernate.validator.constraints.UniqueElements;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.LocalDate;
+
 @Entity
 @Table(name = "users")
 @Data
@@ -30,5 +32,12 @@ public class User  {
     @Size(min=6,max=512)
     String password;
 
+    String pfpUrl;
+
+//    LocalDate dob;
+
+    String country;
+
+    Integer rating;
 
 }
