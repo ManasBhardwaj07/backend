@@ -20,6 +20,9 @@ import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
@@ -86,36 +89,43 @@ public class SecurityConfig {
 //    }
 
 @Bean
-@Order(1)
-SecurityFilterChain oauthChain(HttpSecurity http) throws Exception {
-    return http
-            .securityMatcher("/login", "/login/**", "/oauth2/**", "/login/oauth2/**")
-            .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
-            .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
-            .oauth2Login(oauth -> oauth
-                    .successHandler(oAuth2SuccessHandler) // return JWT JSON from backend
-            )
-            .httpBasic(Customizer.withDefaults())
-            .build();
+public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration configuration = new CorsConfiguration();
+    // Allow only the frontend port (e.g., localhost:3000)
+    configuration.addAllowedOrigin("http://localhost:3000");  // Specify frontend port here
+    configuration.addAllowedMethod("*");  // Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
+    configuration.addAllowedHeader("*");  // Allow all headers
+    configuration.setAllowCredentials(true); // Allow cookies (if needed)
+
+    // Register this configuration for all endpoints
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", configuration);
+    return source;
 }
 
-    // ✅ Chain 2: Your APIs (pure JWT, stateless)
     @Bean
-    @Order(2)
-    SecurityFilterChain apiChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .cors(c -> c.configurationSource(corsConfigurationSource())) // Apply CORS configuration
+                .csrf(csrf -> csrf.disable())  // Disable CSRF for now (may re-enable if necessary)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login", "/login/**", "/oauth2/**", "/login/oauth2/**", "/auth/**").permitAll()
+                        .requestMatchers("/login", "/signup", "/oauth2/**", "/login/oauth2/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-                .httpBasic(basic -> basic.disable())
-                .formLogin(form -> form.disable())
+                .formLogin(form -> form
+                        .loginPage("/login")               // Custom login page
+                        .defaultSuccessUrl("http://localhost:3000/home", true)  // Redirect to /home after login success
+                        .permitAll()
+                )
+                .oauth2Login(oauth -> oauth
+                        .loginPage("/login") // Use custom page for OAuth login
+                        .successHandler(oAuth2SuccessHandler) // Handle success with custom handler
+                        .defaultSuccessUrl("http://localhost:3000/home", true)
+                )
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)) // Allow session if needed
+                .httpBasic(Customizer.withDefaults())
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class) // JWT filter for stateless API
                 .build();
     }
-
 
 }

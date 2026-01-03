@@ -1,6 +1,8 @@
 package com.example.IndiChessBackend.oauth;
 
 import com.example.IndiChessBackend.service.JwtService;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -18,11 +20,10 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
 
 
-    @Override
     public void onAuthenticationSuccess(
             HttpServletRequest request,
             HttpServletResponse response,
-            Authentication authentication) throws IOException {
+            Authentication authentication) throws IOException, ServletException {
 
         String subject;
 
@@ -32,20 +33,28 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         if (principal instanceof org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser) {
             subject = oidcUser.getEmail(); // or oidcUser.getSubject()
         } else if (principal instanceof org.springframework.security.oauth2.core.user.OAuth2User oAuth2User) {
-            // Twitter/X -> depends on userinfo mapping; often id or username
+            // e.g., Github -> depends on userinfo mapping; often id or username
             Object id = oAuth2User.getAttributes().get("id");
             subject = (id != null) ? id.toString() : authentication.getName();
         } else {
+            // Default: use the username (for regular login)
             subject = authentication.getName();
         }
 
+        // Generate the JWT token
         String jwt = jwtService.generateToken(subject);
 
-        response.setStatus(HttpServletResponse.SC_OK);
-        response.setContentType("application/json");
-        response.setCharacterEncoding("UTF-8");
+        System.out.println(jwt);
 
-        response.getWriter().write("{\"token\":\"" + jwt + "\"}");
-        response.getWriter().flush();
+        // Send JWT as a secure HttpOnly cookie
+        Cookie cookie = new Cookie("JWT", jwt);
+        cookie.setHttpOnly(true);  // This prevents client-side access to the cookie (security)
+        cookie.setPath("/");       // Cookie is accessible throughout the domain
+        cookie.setMaxAge(60 * 60 * 24); // Set cookie expiration (1 day, for example)
+        response.addCookie(cookie);
+
+        // Redirect to /home after successful login (you can choose to return JSON instead of redirect)
+        response.sendRedirect("/home");
     }
+
 }
