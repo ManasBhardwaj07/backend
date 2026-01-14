@@ -17,9 +17,9 @@ public class Move {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "match_id", nullable = false)
-//    private Match match;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "match_id", nullable = false)
+    private Match match;
 
     private int ply;            // 1..N (half-move index)
     private int moveNumber;     // 1,2,3...

@@ -56,25 +56,24 @@ public class AuthController {
             System.out.println(tk);
 
 
-            Cookie jwtCookie = new Cookie("JWT", tk);
-            jwtCookie.setHttpOnly(true); // Prevents JavaScript from accessing the cookie
-            jwtCookie.setPath("/"); // Make sure the cookie is accessible for the entire domain
-            jwtCookie.setMaxAge(3600); // Optional: set cookie expiration (e.g., 1 hour)
-            jwtCookie.setSecure(true); // Optional: set to true if using HTTPS
-            response.addCookie(jwtCookie);
+
+            ResponseCookie cookie = ResponseCookie.from("JWT", tk).httpOnly(true).
+                    secure(false).sameSite("lax").path("/").maxAge(3600).build();
+            response.setHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
 
-            return ResponseEntity.ok("Signed in");
+
+            return ResponseEntity.ok(tk);
         }
 
         return new ResponseEntity<>(new LoginResponseDto(null, "Auth Failed"), HttpStatus.BAD_REQUEST);
     }
 
-//    @GetMapping("home")
-//    public String handleHome(){
-//        System.out.println("Home");
-//        return "Home";
-//    }
+    @GetMapping("home")
+    public ResponseEntity<?> handleHome(){
+        System.out.println("Home");
+        return ResponseEntity.ok("Home");
+    }
 
 
 
