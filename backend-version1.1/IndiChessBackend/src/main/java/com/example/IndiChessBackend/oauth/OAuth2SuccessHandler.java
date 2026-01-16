@@ -62,7 +62,6 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         jwtCookie.setSecure(true); // Optional: set to true if using HTTPS
         response.addCookie(jwtCookie); // Add the cookie to the response
         response.sendRedirect("http://localhost:3000/home");
-
     }
 
 }
