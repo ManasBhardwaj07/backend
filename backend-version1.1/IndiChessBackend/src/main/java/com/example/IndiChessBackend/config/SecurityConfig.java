@@ -3,6 +3,7 @@ package com.example.IndiChessBackend.config;
 import com.example.IndiChessBackend.filters.JwtFilter;
 import com.example.IndiChessBackend.oauth.OAuth2SuccessHandler;
 import com.example.IndiChessBackend.service.MyUserDetailsService;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -76,20 +77,39 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                .cors(c -> c.configurationSource(corsConfigurationSource())) // Apply CORS configuration
-                .csrf(csrf -> csrf.disable())  // Disable CSRF for now (may re-enable if necessary)
+                .cors(c -> c.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable())
+
+                .sessionManagement(sm ->
+                        sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login", "/signup", "/oauth2/**", "/login/oauth2/**").permitAll()
+                        .requestMatchers(
+                                "/signup",
+                                "/login",
+                                "/oauth2/**",
+                                "/login/oauth2/**"
+                        ).permitAll()
+
                         .anyRequest().authenticated()
                 )
-                .oauth2Login(oauth -> oauth
-                        .loginPage("/login") // Use custom page for OAuth login
-                        .successHandler(oAuth2SuccessHandler) // Handle success with custom handler
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) ->
+                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized")
+                        )
                 )
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Allow session if needed
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class) // JWT filter for stateless API
+
+
+                .oauth2Login(oauth -> oauth
+                        .successHandler(oAuth2SuccessHandler)
+                )
+
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+
                 .build();
     }
+
 
 
 }

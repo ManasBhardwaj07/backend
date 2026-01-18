@@ -34,11 +34,11 @@ public class AuthController {
     private final JwtService jwtService;
 
 
-    @PostMapping("signup")
-    public ResponseEntity<User> handleSignup(@RequestBody User user){
-//        System.out.println(user);
+    @PostMapping("/signup")
+    public ResponseEntity<User> handleSignup(@RequestBody User user) {
         return new ResponseEntity<>(authservice.save(user), HttpStatus.CREATED);
     }
+
 
     @PostMapping("login")
     public ResponseEntity<?> handleLogin(HttpServletRequest request,

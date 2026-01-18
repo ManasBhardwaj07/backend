@@ -1,44 +1,45 @@
 package com.example.IndiChessBackend.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.hibernate.validator.constraints.UniqueElements;
-import org.springframework.security.core.userdetails.UserDetails;
-
-import java.time.LocalDate;
+import lombok.*;
 
 @Entity
 @Table(name = "users")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class User  {
+@ToString(exclude = "password")
+public class User {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    Long userId;
-    @Size(min = 4, max = 50,
-            message = "Username must have characters between 4 and 50")
+    private Long userId;
 
-    @Column(name = "user_name", unique = true)
-    String username;
+    @Size(min = 4, max = 50)
+    @Column(name = "user_name", unique = true, nullable = false)
+    private String username;
 
-    @Column(name = "email_id", unique = true)
     @Email
-    String emailId;
+    @Column(name = "email_id", unique = true, nullable = false)
+    private String emailId;
 
-    @Size(min=6,max=512)
-    String password;
+    /**
+     * WRITE_ONLY is CRITICAL:
+     * - accepted from request JSON
+     * - never returned in responses
+     */
+    @Size(min = 6, max = 512)
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    @Column(nullable = false)
+    private String password;
 
-    String pfpUrl;
+    private String pfpUrl;
 
-//    LocalDate dob;
+    private String country;
 
-    String country;
-
-    Integer rating ;// default rating
-
+    @Column(nullable = false)
+    private Integer rating;
 }

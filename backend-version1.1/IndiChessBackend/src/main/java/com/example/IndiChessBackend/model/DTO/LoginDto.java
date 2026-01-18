@@ -5,8 +5,11 @@ import lombok.Data;
 import org.springframework.stereotype.Component;
 
 public class LoginDto {
+
     private String username;
     private String password;
+
+    public LoginDto() {}  // ✅ REQUIRED
 
     public LoginDto(String username, String password) {
         this.username = username;
