@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import com.example.IndiChessBackend.model.GameType;
 
 import static com.example.IndiChessBackend.model.MatchStatus.IN_PROGRESS;
 
@@ -81,7 +82,10 @@ public class MatchService {
 
                     if (player1 != null && player2 != null) {
                         // Create the match
-                        Match newMatch = matchRepo.save(new Match(player1, player2, IN_PROGRESS, 1));
+                        Match newMatch = matchRepo.save(
+                                new Match(player1, player2, IN_PROGRESS, GameType.STANDARD)
+                        );
+
                         Long matchId = newMatch.getId();
 
                         // Store match info

@@ -21,8 +21,11 @@ public class Move {
     @JoinColumn(name = "match_id", nullable = false)
     private Match match;
 
-    private int ply;            // 1..N (half-move index)
-    private int moveNumber;     // 1,2,3...
+    // Half-move index: 1,2,3...
+    private Integer ply;
+
+    // Full-move number: 1,2,3...
+    private Integer moveNumber;
 
     @Enumerated(EnumType.STRING)
     private PieceColor color;   // WHITE / BLACK
@@ -33,8 +36,10 @@ public class Move {
     private String fenBefore;
     private String fenAfter;
 
-//    private Integer moveTimeMs;
-
     private LocalDateTime createdAt;
-}
 
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
+}

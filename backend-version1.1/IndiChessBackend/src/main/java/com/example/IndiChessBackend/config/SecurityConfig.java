@@ -7,17 +7,14 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -32,84 +29,122 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final MyUserDetailsService userDetailService;
+    private final MyUserDetailsService userDetailsService;
     private final JwtFilter jwtFilter;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
+    /* =========================
+       PASSWORD ENCODER
+       ========================= */
+
     @Bean
-    PasswordEncoder passwordEncoder(){
+    public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /* =========================
+       AUTH PROVIDER
+       ========================= */
+
     @Bean
-    public AuthenticationProvider authenticationProvider(){
-        // user details service
-        DaoAuthenticationProvider auth = new DaoAuthenticationProvider(userDetailService);
-        auth.setPasswordEncoder(passwordEncoder());
-        return auth;
+    public AuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider provider =
+                new DaoAuthenticationProvider(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder());
+        return provider;
     }
+
+    /* =========================
+       AUTH MANAGER
+       ========================= */
 
     @Bean
     public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration authenticationConfiguration) throws Exception {
-        return authenticationConfiguration.getAuthenticationManager();
+            AuthenticationConfiguration configuration
+    ) throws Exception {
+        return configuration.getAuthenticationManager();
     }
+
+    /* =========================
+       CORS (FIXED)
+       ========================= */
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        // Allow only the frontend port (e.g., localhost:3000)
-        configuration.setAllowedOrigins(List.of("http://localhost:3000"));  // Frontend port
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));  // Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With"));  // Allow all headers
-        configuration.setAllowCredentials(true); // Allow credentials (cookies, JWT tokens)
+        CorsConfiguration config = new CorsConfiguration();
 
-        configuration.setMaxAge(3600L);
+        // IMPORTANT: allow browser test pages & frontend
+        config.setAllowedOriginPatterns(List.of("http://localhost:*"));
 
-        // Register this configuration for all endpoints
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
+        config.setAllowedMethods(List.of(
+                "GET", "POST", "PUT", "DELETE", "OPTIONS"
+        ));
+        config.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "X-Requested-With"
+        ));
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source =
+                new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
         return source;
     }
 
-
+    /* =========================
+       FILTER CHAIN
+       ========================= */
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        return http
-                .cors(c -> c.configurationSource(corsConfigurationSource()))
+    public SecurityFilterChain securityFilterChain(HttpSecurity http)
+            throws Exception {
+
+        http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
 
-                .sessionManagement(sm ->
-                        sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
 
+                .authenticationProvider(authenticationProvider())
+
                 .authorizeHttpRequests(auth -> auth
+                        // AUTH FREE ENDPOINTS
                         .requestMatchers(
-                                "/signup",
                                 "/login",
+                                "/signup",
                                 "/oauth2/**",
-                                "/login/oauth2/**"
+
+                                // WEBSOCKET HANDSHAKE (CRITICAL)
+                                "/ws",
+                                "/ws/**"
                         ).permitAll()
 
                         .anyRequest().authenticated()
                 )
+
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((request, response, authException) ->
-                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized")
+                        .authenticationEntryPoint((req, res, e) ->
+                                res.sendError(
+                                        HttpServletResponse.SC_UNAUTHORIZED,
+                                        "Unauthorized"
+                                )
                         )
                 )
 
-
-                .oauth2Login(oauth -> oauth
-                        .successHandler(oAuth2SuccessHandler)
+                .oauth2Login(oauth ->
+                        oauth.successHandler(oAuth2SuccessHandler)
                 )
 
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(
+                        jwtFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                );
 
-                .build();
+        return http.build();
     }
-
-
-
 }

@@ -1,7 +1,6 @@
 package com.example.IndiChessBackend.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.PastOrPresent;
 import lombok.Data;
 
@@ -18,18 +17,28 @@ public class Match {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    /* =========================
+       PLAYERS
+       ========================= */
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "player1_id", nullable = false)
     private User player1;
 
-    @ManyToOne
-    @JoinColumn(name = "player2_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "player2_id")
     private User player2;
 
-    @Enumerated(EnumType.STRING)
-    private MatchStatus status; // PLAYER1_WON, DRAW, PLAYER2_WON
+    /* =========================
+       GAME STATE
+       ========================= */
 
-    private Integer currentPly; // helps with sync & validation
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private MatchStatus status;   // IN_PROGRESS, PLAYER1_WON, PLAYER2_WON, DRAW, RESIGNED
+
+    @Column(name = "current_ply")
+    private Integer currentPly;   // half-move counter
 
     @Column(name = "fen_current", length = 200)
     private String fenCurrent;
@@ -37,49 +46,73 @@ public class Match {
     @Column(name = "last_move_uci", length = 10)
     private String lastMoveUci;
 
+    /* =========================
+       MOVES
+       ========================= */
+
     @OneToMany(
             mappedBy = "match",
             cascade = CascadeType.ALL,
             orphanRemoval = true,
             fetch = FetchType.LAZY
     )
-    @OrderBy("ply ASC") // VERY IMPORTANT
+    @OrderBy("ply ASC")
     private List<Move> moves = new ArrayList<>();
 
+    /* =========================
+       META
+       ========================= */
+
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private GameType gameType;
 
     @PastOrPresent
+    @Column(name = "started_at")
     private LocalDateTime startedAt;
 
-    @FutureOrPresent
+    @PastOrPresent
+    @Column(name = "finished_at")
     private LocalDateTime finishedAt;
 
-    // ADD THESE FIELDS:
-    @Column(name = "created_at", nullable = false, updatable = false)
     @PastOrPresent
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Update constructor
-    public Match(User player1, User player2, MatchStatus matchStatus, int i) {
+    /* =========================
+       CONSTRUCTORS
+       ========================= */
+
+    public Match() {}
+
+    public Match(User player1, User player2, MatchStatus status, GameType gameType) {
         this.player1 = player1;
         this.player2 = player2;
-        this.status = matchStatus;
-        this.currentPly = i;
+        this.status = status;
+        this.gameType = gameType;
+        this.currentPly = 0;
         this.createdAt = LocalDateTime.now();
         this.startedAt = LocalDateTime.now();
     }
 
-    public Match(){}
 
-    // Add @PrePersist and @PreUpdate annotations
+    /* =========================
+       LIFECYCLE
+       ========================= */
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.startedAt = LocalDateTime.now();
+        if (this.status == null) {
+            this.status = MatchStatus.IN_PROGRESS;
+        }
+        if (this.currentPly == null) {
+            this.currentPly = 0;
+        }
     }
 
     @PreUpdate
