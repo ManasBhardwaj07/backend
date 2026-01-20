@@ -51,7 +51,7 @@ public class GameService {
 
         GameState state = activeGames.computeIfAbsent(
                 matchId,
-                id -> initializeGame(match)
+                id -> initializeGameFromDb(match)
         );
 
         Principal principal = request.getUserPrincipal();
@@ -86,9 +86,8 @@ public class GameService {
         GameState state = activeGames.computeIfAbsent(matchId, id -> {
             Match match = matchRepo.findById(id)
                     .orElseThrow(() -> new RuntimeException("Match not found"));
-            return initializeGame(match);
+            return initializeGameFromDb(match);
         });
-
 
         Match match = matchRepo.findById(matchId)
                 .orElseThrow(() -> new RuntimeException("Match not found"));
@@ -96,12 +95,10 @@ public class GameService {
         String username = principal.getName();
         boolean isWhite = username.equals(state.getWhitePlayer());
 
-        // Turn enforcement
         if (state.isWhiteTurn() != isWhite) {
             throw new RuntimeException("Not your turn");
         }
 
-        // Validate coordinates
         if (move.getFromRow() == null || move.getFromCol() == null ||
                 move.getToRow() == null || move.getToCol() == null) {
             throw new RuntimeException("Invalid move coordinates");
@@ -117,7 +114,6 @@ public class GameService {
             throw new RuntimeException("You cannot move opponent pieces");
         }
 
-        // Pawn-only validation (current scope)
         if (Character.toLowerCase(piece.charAt(0)) == 'p') {
             boolean legal = com.example.IndiChessBackend.service.chess.MoveValidator
                     .isLegalPawnMove(
@@ -136,20 +132,16 @@ public class GameService {
             throw new RuntimeException("Only pawn moves supported right now");
         }
 
-        // -------- FEN BEFORE --------
         String fenBefore = convertBoardToFEN(state.getBoard(), state.isWhiteTurn());
 
-        // -------- APPLY MOVE --------
         state.getBoard()[move.getFromRow()][move.getFromCol()] = "";
         state.getBoard()[move.getToRow()][move.getToCol()] = piece;
 
         state.setWhiteTurn(!state.isWhiteTurn());
         state.setLastMoveTime(LocalDateTime.now());
 
-        // -------- FEN AFTER --------
         String fenAfter = convertBoardToFEN(state.getBoard(), state.isWhiteTurn());
 
-        // -------- CREATE MOVE ENTITY --------
         int nextPly = (match.getCurrentPly() == null ? 0 : match.getCurrentPly()) + 1;
 
         Move dbMove = new Move();
@@ -169,9 +161,8 @@ public class GameService {
         match.setFenCurrent(fenAfter);
         match.setLastMoveUci(dbMove.getUci());
 
-        matchRepo.save(match); // cascades Move
+        matchRepo.save(match);
 
-        // -------- RESPONSE DTO --------
         MoveDTO dto = new MoveDTO();
         dto.setMatchId(matchId);
         dto.setFromRow(move.getFromRow());
@@ -189,7 +180,6 @@ public class GameService {
         messagingTemplate.convertAndSend("/topic/moves/" + matchId, dto);
         return dto;
     }
-
 
     /* =========================
        JOIN / RESIGN
@@ -226,11 +216,31 @@ public class GameService {
        INITIALIZATION
        ========================= */
 
-    private GameState initializeGame(Match match) {
+    private GameState initializeGameFromDb(Match match) {
+        String[][] board = initialBoard();
+        boolean whiteTurn = true;
+
+        if (match.getMoves() != null && !match.getMoves().isEmpty()) {
+            match.getMoves().stream()
+                    .sorted((a, b) -> Integer.compare(a.getPly(), b.getPly()))
+                    .forEach(move -> {
+                        int fromCol = move.getUci().charAt(0) - 'a';
+                        int fromRow = 8 - Character.getNumericValue(move.getUci().charAt(1));
+                        int toCol = move.getUci().charAt(2) - 'a';
+                        int toRow = 8 - Character.getNumericValue(move.getUci().charAt(3));
+
+                        String piece = board[fromRow][fromCol];
+                        board[fromRow][fromCol] = "";
+                        board[toRow][toCol] = piece;
+                    });
+
+            whiteTurn = match.getCurrentPly() % 2 == 0;
+        }
+
         return new GameState(
-                initialBoard(),
-                true,
-                "IN_PROGRESS",
+                board,
+                whiteTurn,
+                match.getStatus().name(),
                 match.getPlayer1().getUsername(),
                 match.getPlayer2().getUsername(),
                 LocalDateTime.now()
